@@ -1,0 +1,2 @@
+experiment,model,development_subjects,enrollment_subjects,genuine_scores,impostor_scores,accuracy,f1,eer,far,frr,threshold,status
+E1,template_cosine,30,11,119,1190,0.7761650114591291,0.4104627766599598,0.20168067226890754,0.2319327731092437,0.14285714285714285,0.9971492632464742,MEASURED_VERIFICATION

@@ -1,0 +1,10 @@
+{
+  "experiment": "E5",
+  "model": "random_forest",
+  "n_windows": 242,
+  "latency_ms_total": 220.84779999568127,
+  "latency_ms_per_window": 0.912594214858187,
+  "peak_memory_mb": 0.3820362091064453,
+  "status": "MEASURED_HOST_BENCHMARK",
+  "battery": "NOT_MEASURED"
+}

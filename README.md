@@ -1,169 +1,103 @@
-# Risk-Adaptive Mobile Money Gait Authentication
+# Risk-Adaptive Continuous Authentication for Mobile-Money Transactions Using Smartphone-Based Gait Recognition
 
-A risk-adaptive continuous behavioral biometric authentication system for mobile money transactions.
+This repository implements the prototype specified by Assignment #1. It uses smartphone accelerometer and gyroscope data as an additional behavioural signal within a mobile-money authentication workflow. The system does not replace PIN or OTP authentication. It produces a gait confidence and combines that confidence with transaction risk to return **ALLOW**, **STEP_UP_AUTHENTICATION**, or **DENY**.
 
-The architecture couples a continuous gait verification pipeline (using a CNN-LSTM deep learning sequence model exported to ONNX) with a contextual Identity and Access Management (IAM) policy engine. Rather than treating gait as a fragile binary gatekeeper, the system leverages gait as a dynamic confidence modifier within a defense-in-depth framework—balancing everyday user friction against transaction risk.
+## Architecture
 
----
+The implementation follows the proposal’s five layers:
 
-## Core Research Thesis
+| Layer | Prototype component | Responsibility |
+|---|---|---|
+| Sensing | `data.py` | Load phone accelerometer and gyroscope observations. |
+| Preprocessing | `preprocessing.py` | Validate, filter, derive orientation-reduced magnitudes, normalize, and segment windows. |
+| Feature/Representation | `features.py` and raw-window path | Handcrafted classical features or normalized raw six-channel windows. |
+| Matching | `models.py`, `authentication.py` | SVM, Random Forest, k-NN, or CNN-LSTM prediction and verification confidence. |
+| Risk and Decision | `risk_engine.py` | Independent risk classification and proposal-defined decision matrix. |
 
-> Continuous gait biometrics provide a passive, continuous confidence signal rather than an absolute binary authorization gate. By fusing biometric confidence with transaction-level risk context (transfer value, counterparty familiarity, and device anomalies), authentication can dynamically adapt—authorizing routine payments frictionlessly, stepping up high-consequence transfers, or denying anomalous activity outright.
+## Dataset
 
----
+The primary supported source is the [UCI WISDM Smartphone and Smartwatch Activity and Biometrics Dataset](https://archive.ics.uci.edu/dataset/507/wisdm+smartphone+and+smartwatch+activity+and+biometrics+dataset). UCI describes 51 subjects, phone and smartwatch accelerometer/gyroscope streams, 20 Hz sampling, subject identifiers, activity labels, and raw rows containing subject, activity, timestamp, x, y, and z. The prototype uses phone walking activity code `A` and does not assume that the dataset contains controlled footwear, surface, carrying-position, calendar-ageing, mimicry, survey, or battery labels.
 
-## System Architecture
+The proposal also identifies the [OU-ISIR inertial gait dataset](http://www.am.sanken.osaka-u.ac.jp/BiometricDB/InertialGait.html). It is supported as a future adapter, but its download requires a signed institutional release agreement and password. No OU-ISIR data is claimed as locally available unless the user supplies it.
 
-[ Android Client ]
+## Installation
 
-Accelerometer / Gyroscope Sampling (50 Hz)
-
-Thread-Safe Circular Ring Buffer
-
-Retrofit HTTP Client / Android BiometricPrompt
-│
-▼  (10-second window / 200 samples)
-[ FastAPI Inference Service ]
-
-Sliding-Window Preprocessing & Normalization
-
-ONNX Runtime Evaluation (CNN-LSTM Model)
-
-Cosine Similarity vs. Enrolled Template
-│
-▼  (Biometric Confidence: High / Medium / Low)
-[ Risk-Adaptive Policy Engine ]
-
-Evaluates: Amount, New Recipient, Geolocation Anomaly
-
-Resolves IAM Policy Decision:
-├── ALLOW           (Frictionless execution)
-├── STEP_UP_LIGHT   (Contextual PIN / Device Biometric)
-└── DENY            (Transaction blocked & audited)
-
-
-### End-to-End Decision Matrix
-
-| Biometric Confidence | Transaction Risk Context | Engine Decision | User Experience |
-| :--- | :--- | :--- | :--- |
-| **High** ($\ge 0.998$) | Low (Routine amount, trusted contact) | **ALLOW** | Frictionless (Instant execution) |
-| **Medium / High** | Elevated (New recipient or high value) | **STEP_UP_LIGHT** | Contextual PIN / Biometric prompt |
-| **Low** ($< 0.995$) | High / Anomalous location | **DENY** | Transaction blocked & audit logged |
-
----
-
-## Empirical Verification Highlights
-
-Evaluated on the WISDM benchmark dataset under strict **subject-disjoint partitions** (30 calibration subjects, 11 unseen enrollment subjects) with non-overlapping 10-second evaluation windows to eliminate temporal autocorrelation leakage:
-
-* **Biometric Verification (E1):**
-  * **Equal Error Rate (EER):** 20.17%
-  * **Overall Accuracy:** 77.62%
-  * **Operating Threshold:** 0.9971
-  * **False Acceptance Rate (FAR):** 23.19% (across 1,190 zero-effort impostor evaluations)
-  * **False Rejection Rate (FRR):** 14.29% (across 119 genuine evaluations)
-* **Multiclass Baseline Contrast:**
-  * Conventional closed-set classifiers (SVM, Random Forest, KNN) achieved **0.0% accuracy** and **0.0 macro F1** on the subject-disjoint test set, demonstrating the limitation of closed-set classification and the requirement for open-set template matching in open-world biometrics.
-* **Host Resource Profiling (E5):**
-  * Sub-millisecond host inference latency ($0.055\text{–}0.913\text{ ms}$ per evaluation window) with peak memory allocation $<0.4\text{ MB}$.
-
----
-
-## Experimental Scope & Evaluation Status
-
-| Experiment | Status | Scope & Rationale |
-| :--- | :--- | :--- |
-| **E1: Biometric Verification** | **Completed** | Established verification baseline: 20.17% EER, 77.62% accuracy on unseen subjects. |
-| **E2: Environmental Invariance** | **Excluded** | Benchmark dataset lacks ground-truth annotations for terrain, footwear, and carry variations. |
-| **E3: Longitudinal Ageing** | **Excluded** | Benchmark dataset lacks multi-week session timestamps. |
-| **E4: Adversarial Mimicry** | **Partial** | Quantified against 1,190 zero-effort impostor attempts; active physical mimicry reserved for future human trials. |
-| **E5: Resource Profiling** | **Completed** | Host inference profiling across models ($<1\text{ ms}$ latency, $<0.4\text{ MB}$ RAM). |
-| **E6: Friction Adaptation** | **Demonstrated** | Validated end-to-end through `ALLOW`, `STEP_UP_LIGHT`, and `DENY` states on Android emulator. |
-
----
-
-## Repository Structure
-
-```text
-├── backend/
-│   ├── app/
-│   │   ├── main.py                   # FastAPI server endpoints
-│   │   ├── models/                   # ONNX runtime wrapper & gait sequence models
-│   │   └── services/                 # Risk engine & policy evaluation
-│   ├── gait_model.onnx               # Exported CNN-LSTM ONNX model
-│   └── requirements.txt              # Backend dependencies
-├── gait-mobile-money-authentication/
-│   ├── scripts/
-│   │   ├── prepare_wisdm.py          # Data ingestion, windowing & subject-disjoint split
-│   │   ├── run_experiments.py        # E1-E6 verification, baseline & benchmark runner
-│   │   └── plot_evaluation_figures.py# Pure NumPy/Matplotlib ROC & score distribution generator
-│   ├── src/gait_auth/
-│   │   ├── data.py                   # WISDM signal parser & interpolation
-│   │   ├── preprocessing.py          # Filtering & temporal windowing
-│   │   ├── features.py               # Time/frequency domain feature extraction
-│   │   ├── models.py                 # Classical models & CNN-LSTM PyTorch definition
-│   │   ├── risk_engine.py            # Contextual risk classification logic
-│   │   └── evaluation.py             # Open-set template matching & EER calculations
-│   └── results/
-│       ├── tables/                   # e1_verification.csv, e1_classification_baseline.csv
-│       ├── json/                     # e5 host latency & memory benchmarks
-│       └── figures/                  # e1_roc_curve.png, e1_score_distribution.png
-└── android/ (MobileMoneyGaitAuth)
-    └── app/src/main/
-        ├── AndroidManifest.xml       # Hardware sensor & foreground service permissions
-        ├── java/com/momo/gaitauth/
-        │   ├── MainActivity.kt       # Transaction UI & step-up biometric prompt logic
-        │   ├── api/                  # Retrofit networking client
-        │   └── sensor/
-        │       ├── GaitSensorService.kt # Continuous background sensor listener
-        │       └── GaitDataBuffer.kt    # Synchronized circular ring buffer
-        └── res/layout/activity_main.xml
-Installation & Quickstart
-1. Backend Inference Service
-PowerShell
-# Navigate to backend directory
-cd backend
-
-# Initialize and activate virtual environment
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-
-# Install requirements
-pip install -r requirements.txt
-
-# Launch FastAPI service
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-API documentation will be accessible at http://localhost:8000/docs.
-
-2. Android Client Application
-Open the MobileMoneyGaitAuth project directory in Android Studio.
-
-Synchronize project Gradle dependencies.
-
-Configure the Retrofit API base URL:
-
-Android Emulator: http://10.0.2.2:8000/
-
-Physical Device: http://<HOST_MACHINE_LOCAL_IP>:8000/
-
-Build and deploy to an emulator or USB-connected device running Android API 34+.
-
-Evaluation & Reproduction
-To reproduce the subject-disjoint windowing, evaluation tables, and figures:
-
-PowerShell
+```bash
 cd gait-mobile-money-authentication
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+export PYTHONPATH="$PWD/src"
+```
 
-# 1. Window raw WISDM data into subject-disjoint splits
-python scripts/prepare_wisdm.py --raw-root path/to/WISDM/raw --output data/processed/wisdm_subject_disjoint.npz
+Install PyTorch separately if the CNN-LSTM experiment is to be run:
 
-# 2. Run verification pipeline and host profiling
-python scripts/run_experiments.py --npz data/processed/wisdm_subject_disjoint.npz --output results
+```bash
+pip install torch
+```
 
-# 3. Generate ROC and score distribution plots
-python scripts/plot_evaluation_figures.py
-Generated publication plots:
+## Dataset preparation
 
-results/figures/e1_roc_curve.png
+Download the WISDM archive from UCI and extract it under `data/raw/wisdm/`. The loader searches recursively for files named like `data_1600_accel_phone.txt` and `data_1600_gyro_phone.txt`. It reads only walking records (`activity == A`), validates numeric observations, aligns phone modalities by timestamp, and discards unmatched or invalid rows rather than imputing fabricated sensor values.
 
-results/figures/e1_score_distribution.png
+Create the subject-disjoint NPZ consumed by the experiment runner:
+
+```bash
+PYTHONPATH=src python scripts/prepare_wisdm.py \
+  --raw-root data/raw/wisdm \
+  --output data/processed/wisdm_subject_disjoint.npz
+```
+
+The preparation script uses the default 60/20/20 subject split, 10-second windows, and 10-second stride. The non-overlapping stride is intentional for authentication evaluation: enrollment and verification windows must not share raw sensor samples. It saves only train/test windows and labels; the validation subject list is retained for auditability.
+
+## Risk-policy usage
+
+```bash
+PYTHONPATH=src python -m gait_auth.cli decision --confidence high --amount 50
+PYTHONPATH=src python -m gait_auth.cli decision --confidence high --amount 1500
+PYTHONPATH=src python -m gait_auth.cli decision --confidence low --amount 1500
+```
+
+The default policy is:
+
+| Gait confidence | Low risk | Medium risk | High risk |
+|---|---|---|---|
+| High | Allow | Allow | Step-up authentication |
+| Medium | Allow | Step-up authentication | Step-up authentication |
+| Low | Step-up authentication | Step-up authentication | Deny |
+
+Gait never independently authorizes a high-risk transaction.
+
+## Testing
+
+Run the automated software tests with:
+
+```bash
+PYTHONPATH=src pytest -q
+```
+
+The tests cover data parsing, invalid and missing observations, filtering and segmentation, feature dimensions, model prediction, authentication scoring, risk classification, all policy cells, invalid inputs, and edge cases.
+
+## Research experiments
+
+The `gait_auth.experiments` module provides reproducible output paths for:
+
+| Experiment | Implementation status in the public-data prototype |
+|---|---|
+| E1 | Executable after preparing subject-disjoint windows; classification metrics are measured, while FAR/FRR/EER require a verification-score protocol. |
+| E2 | Not conducted for WISDM unless condition metadata is supplied; no artificial condition labels are created. |
+| E3 | Not conducted without genuine session dates at same-day, 1-week, 2-week, and 4-week intervals. |
+| E4 | Zero-effort impostor analysis is possible from held-out subjects; mimicry is not conducted without labelled self-collected mimicry data. |
+| E5 | Host inference latency and process memory can be benchmarked; smartphone battery impact is not measured in this sandbox. |
+| E6 | False step-up rate can be computed from labelled decisions; perceived friction is not conducted without participant survey responses. |
+
+All result files must distinguish **measured**, **expected**, **not conducted**, and **limited** outcomes. The repository must never report fabricated participants, observations, metrics, attacks, survey answers, or battery measurements.
+
+## Security and privacy
+
+Gait is sensitive biometric information. Raw signals and templates should be de-identified, access-controlled, retained only as long as necessary, and separated from names, phone numbers, and mobile-money account identifiers. The prototype contains no real mobile-money integration and no transaction execution capability.
+
+## References
+
+[1]: https://archive.ics.uci.edu/dataset/507/wisdm+smartphone+and+smartwatch+activity+and+biometrics+dataset "UCI WISDM Smartphone and Smartwatch Activity and Biometrics Dataset"
+[2]: http://www.am.sanken.osaka-u.ac.jp/BiometricDB/InertialGait.html "OU-ISIR Gait Database, Inertial Sensor Dataset"

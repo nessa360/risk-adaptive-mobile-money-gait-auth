@@ -1,0 +1,26 @@
+[
+  {
+    "experiment": "E2",
+    "status": "NOT_CONDUCTED",
+    "interpretation": "No condition metadata is available in the supplied dataset.",
+    "limitation": "WISDM activity data does not provide the requested controlled speed, surface, footwear, and carrying-position factors."
+  },
+  {
+    "experiment": "E3",
+    "status": "NOT_CONDUCTED",
+    "interpretation": "Calendar-based template ageing cannot be measured without session dates.",
+    "limitation": "WISDM subject/activity files do not provide enrolment-to-verification intervals for same-day, one-, two-, and four-week comparisons."
+  },
+  {
+    "experiment": "E4",
+    "status": "PARTIAL",
+    "interpretation": "Zero-effort impostor evaluation can be derived from subject-disjoint data; mimicry is not conducted.",
+    "limitation": "No labelled self-collected mimicry recordings were supplied."
+  },
+  {
+    "experiment": "E6",
+    "status": "PARTIAL",
+    "interpretation": "False step-up can be computed from genuine labelled decisions; perceived friction is not conducted.",
+    "limitation": "No participant survey responses were supplied; use docs/usability_questionnaire.md for future collection."
+  }
+]
